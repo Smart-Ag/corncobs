@@ -189,9 +189,13 @@ class StreamCOBS(object):
 
     def loop_stop(self):
         self.loop_running = False
+        self.close()
+
+    def close(self):
+        pass
 
 
-class SerialCOBS(object):
+class SerialCOBS(StreamCOBS):
     """
     A serial implementation of StreamCOBS using pySerial.
 
@@ -204,9 +208,8 @@ class SerialCOBS(object):
         Keyword arguments to be passed directly into serial.Serial
     """
     def __init__(self, serial_port, **serial_options):
-
         self.ser = serial.Serial(serial_port, **serial_options)
-        self.stream_cobs = StreamCOBS(self.ser)
+        super().__init__(self.ser)
 
     def close(self):
         self.ser.close()
