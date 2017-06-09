@@ -2,6 +2,7 @@ __version__ = '0.1'
 
 import io
 import struct
+import threading
 
 import serial
 from cobs import cobs
@@ -114,6 +115,8 @@ class StreamCOBS(object):
     """Class that sends and receives data in COBS format from a stream"""
     def __init__(self, stream):
         self.stream = stream
+        self.callbacks = []
+        self.loop_running = False
 
     def write(self, data):
         """
@@ -155,13 +158,37 @@ class StreamCOBS(object):
         while True:
             inbyte = self.stream.read(1)
             if inbyte != b'\x00':  # Read till next null byte
-                if count==max_bytes:  # Stop if data stream too long
+                if count==max_bytes or len(inbyte) == 0:  # Stop if data stream too long
                     return None
                 raw_data.append(inbyte[0])
                 count+=1
                 continue
             break  # Stop on null byte
         return cobs.decode(raw_data)
+
+    def update(self):
+        """Reads from the stream and triggers callbacks."""
+        data = self.read()
+        if data is not None and len(data) > 0:
+            print('in update',data)
+            for cb in self.callbacks:
+                cb(data)
+
+    def add_listener(self, cb):
+        """Adds a callback."""
+        self.callbacks.append(cb)
+
+    def loop_thread(self):
+        self.loop_running = True
+        t = threading.Thread(target=self.loop_start, daemon=True)
+        t.start()
+
+    def loop_start(self):
+        while self.loop_running:
+            self.update()
+
+    def loop_stop(self):
+        self.loop_running = False
 
 
 class SerialCOBS(object):

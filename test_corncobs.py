@@ -2,7 +2,6 @@ import io
 import struct
 
 import pytest
-
 from corncobs import DataPacket, StreamCOBS
 
 def test_datapacket():
@@ -70,6 +69,28 @@ def test_streamcobs():
     cobs_io = StreamCOBS(test_stream)
     cobs_io.write(test_array)
     test_stream.seek(0)
+
     out_array = cobs_io.read()
     assert out_array == test_array
+
+    cobs_io.stream.seek(0)
+
+    cb_called = False
+    out_cb = None
+    def cb(packet):
+        cb_called = True
+        print('in callback', cb_called, id(cb_called), packet)
+        out_cb = packet
+
+    cobs_io.add_listener(cb)
+    cobs_io.loop_thread()
+
+    import time
+    while not cb_called:
+        print(cb_called, id(cb_called))
+        time.sleep(1.0)
+        pass
+
+    assert out_cb == test_array
+
     print('All tests passed!')
