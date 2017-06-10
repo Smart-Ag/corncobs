@@ -61,6 +61,14 @@ def test_datapacket():
     data1 = pck.unpack(buf)
     assert data1 == data
 
+    # Test crc16 calculator
+    assert crc16(b'hello') == b'\x34\xBD'
+
+    # Test failure on invalid CRC16 checksum
+    buf = buf[:-2] + b'\0\0'
+    with pytest.raises(ValueError):
+        pck.unpack(buf)
+
     # Test set_field
     pck = DataPacket(packet_def, data)
     pck.set_field('cxreqgear', 5)
@@ -167,3 +175,6 @@ def test_streamcobs():
     do_test(loop_cobs, test_array, test_pkt)
 
     print('All tests passed!')
+
+if __name__ == '__main__':
+    pytest.main(['--cov'])

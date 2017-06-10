@@ -127,7 +127,7 @@ class DataPacket(object):
         # Extract CRC and check integrity
         crc = buffer[-2:]
         data = buffer[:-2]
-        
+
         if crc16(data) != crc:
             raise ValueError('CRC checksum failed!')
         else:
@@ -172,7 +172,7 @@ def crc16(data: bytes) -> bytes:
             cur_byte >>= 1
     crc = (~crc & 0xFFFF)
     crc = (crc << 8) | ((crc >> 8) & 0xFF)
-    return struct.pack('<H', crc & 0xFFFF)
+    return struct.pack('=H', crc & 0xFFFF)
 
 class StreamCOBS(object):
     """Class that sends and receives data in COBS format from a stream"""
