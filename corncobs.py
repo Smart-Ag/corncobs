@@ -46,6 +46,9 @@ class DataPacket(object):
         else:
             raise ValueError('Key name mismatch')
 
+    def calcsize(self):
+        return struct.calcsize(self.fmt)
+
     def set_field(self, field_name, value):
         """Sets value of a specific field in the data packet.
 
@@ -132,7 +135,7 @@ class StreamCOBS(object):
         int
             Number of bytes written to stream
         """
-        encoded_data = b'\0' + cobs.encode(data) + b'\0'
+        encoded_data =  b'\0' + cobs.encode(data) + b'\0'
         return self.stream.write(encoded_data)
 
     def read(self, max_bytes=255):
@@ -164,7 +167,10 @@ class StreamCOBS(object):
                 count+=1
                 continue
             break  # Stop on null byte
-        return cobs.decode(raw_data)
+        if len(raw_data) < 2:
+            return None
+        else:
+            return cobs.decode(raw_data)
 
     def update(self):
         """Reads from the stream and triggers callbacks."""
@@ -184,7 +190,10 @@ class StreamCOBS(object):
 
     def loop_start(self):
         while self.loop_running:
-            self.update()
+            try:
+                self.update()
+            except Exception  as e:
+                print('Error in cob:',e)
 
     def loop_stop(self):
         self.loop_running = False
