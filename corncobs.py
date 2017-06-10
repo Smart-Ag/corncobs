@@ -1,4 +1,4 @@
-__version__ = '0.1'
+__version__ = '0.2'
 
 import io
 import struct
@@ -170,7 +170,6 @@ class StreamCOBS(object):
         """Reads from the stream and triggers callbacks."""
         data = self.read()
         if data is not None and len(data) > 0:
-            print('in update',data)
             for cb in self.callbacks:
                 cb(data)
 
