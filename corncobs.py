@@ -1,8 +1,9 @@
-__version__ = '0.2'
+__version__ = '0.3'
 
 import io
 import struct
 import threading
+import collections.abc as cabc
 
 import serial
 from cobs import cobs
@@ -18,7 +19,7 @@ class DataPacket(object):
                  'int32'   : 'i',
                  'string'  : 's'}
 
-    def __init__(self, definition, value_dict=None):
+    def __init__(self, definition, values=None):
         """
         definition : sequence of tuples
             Example: [('cxthrottle', 'float32'), ('cxreqgear','uint8')]
@@ -34,19 +35,28 @@ class DataPacket(object):
         self.definition = definition
         self.fmt = ''.join(data_format)
 
-        if value_dict is not None:
-            self.init(value_dict)
+        if values is not None:
+            self.init(values)
         else:
             self.values = None
 
-    def init(self, value_dict):
+    def init(self, values):
         """Initializes datapacket."""
-        if all(k in self.fields for k in value_dict):
-            self.values = dict(value_dict)
+        if isinstance(values, cabc.Mapping):
+            if all(k in self.fields for k in value_dict):
+                self.values = dict(value_dict)
+            else:
+                raise ValueError('Key name mismatch')
+        elif isinstance(values, cabc.Sequence):
+            if len(values) == len(self.fields):
+                self.values = {f_name, val for f_name,val in zip(self.fields, values)}
+            else:
+                raise ValueError('Number of values {} does not must match number of fields, {}'.format(len(values), len(self.fields)))
         else:
-            raise ValueError('Key name mismatch')
+            raise ValueError('Input to init() should be either a sequence or a mapping')
 
     def calcsize(self):
+        """Returns the size of the data packet."""
         return struct.calcsize(self.fmt)
 
     def set_field(self, field_name, value):
@@ -137,6 +147,16 @@ class StreamCOBS(object):
         """
         encoded_data =  b'\0' + cobs.encode(data) + b'\0'
         return self.stream.write(encoded_data)
+
+    def write_packet(self, packet):
+        """Writes a DataPacket encoded using COBS.
+
+        Parameters
+        ----------
+        packet : DataPacket
+            Data packet to be written to stream
+        """
+        self.write(packet.pack())
 
     def read(self, max_bytes=255):
         """
