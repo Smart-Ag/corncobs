@@ -41,19 +41,32 @@ class DataPacket(object):
             self.values = None
 
     def init(self, values):
-        """Initializes datapacket."""
+        """Initializes datapacket.
+
+        Parameters
+        ----------
+        values - dict or list
+        """
         if isinstance(values, cabc.Mapping):
-            if all(k in self.fields for k in value_dict):
-                self.values = dict(value_dict)
+            if all(k in self.fields for k in values):
+                self.values = dict(values)
             else:
                 raise ValueError('Key name mismatch')
         elif isinstance(values, cabc.Sequence):
             if len(values) == len(self.fields):
-                self.values = {f_name, val for f_name,val in zip(self.fields, values)}
+                self.values = {f_name: val for f_name,val in zip(self.fields, values)}
             else:
                 raise ValueError('Number of values {} does not must match number of fields, {}'.format(len(values), len(self.fields)))
         else:
             raise ValueError('Input to init() should be either a sequence or a mapping')
+
+    def __eq__(self, other):
+        """Check equality of datapackets."""
+        return self.values == other.values
+
+    def copy(self):
+        """Returns a copy."""
+        return DataPacket(self.definition, self.values)
 
     def calcsize(self):
         """Returns the size of the data packet."""
@@ -74,17 +87,17 @@ class DataPacket(object):
 
         self.values[field_name] = value
 
-    def pack(self, value_dict=None):
+    def pack(self, values=None):
         """
         Packs values into byte array. Uses previously set values by default.
 
         Parameters
         ----------
-        value_dict - dict (optional)
+        values - dict or list (optional)
             Specify values to be packed.
         """
-        if value_dict is not None:
-            self.init(value_dict)
+        if values is not None:
+            self.init(values)
 
         if self.values is None:
             raise ValueError('Data packet not initialized!')
@@ -172,14 +185,20 @@ class StreamCOBS(object):
 
         start_byte = -1
         for i in range(max_bytes-5):
-            start_byte = self.stream.read(1)
+            try:
+                start_byte = self.stream.read(1)
+            except:
+                continue
             if start_byte == b'\0':
                 break
         else:
             return None
 
         while True:
-            inbyte = self.stream.read(1)
+            try:
+                inbyte = self.stream.read(1)
+            except:
+                continue
             if inbyte != b'\x00':  # Read till next null byte
                 if count==max_bytes or len(inbyte) == 0:  # Stop if data stream too long
                     return None
@@ -204,23 +223,28 @@ class StreamCOBS(object):
         self.callbacks.append(cb)
 
     def loop_thread(self):
+        """Start update loop in a background thread."""
         self.loop_running = True
         t = threading.Thread(target=self.loop_start, daemon=True)
         t.start()
 
     def loop_start(self):
+        """Start update loop."""
         while self.loop_running:
             try:
                 self.update()
-            except Exception  as e:
-                print('Error in cob:',e)
+            except Exception as e:
+                print('COB Loop Error:',e)
 
     def loop_stop(self):
+        """Stop update loop."""
         self.loop_running = False
         self.close()
 
     def close(self):
-        pass
+        """Optional close functionality."""
+        if hasattr(self.stream, 'close'):
+            self.stream.close()
 
 
 class SerialCOBS(StreamCOBS):
@@ -232,12 +256,8 @@ class SerialCOBS(StreamCOBS):
     serial_port : str
         Serial port to cnect to
 
-    serial_options : dict
-        Keyword arguments to be passed directly into serial.Serial
+    All other position and keyword arguments are passed directly to pyserial
     """
-    def __init__(self, serial_port, **serial_options):
-        self.ser = serial.Serial(serial_port, **serial_options)
+    def __init__(self, serial_port, *args, **kwargs):
+        self.ser = serial.serial_for_url(serial_port, *args, **kwargs)
         super().__init__(self.ser)
-
-    def close(self):
-        self.ser.close()
