@@ -20,7 +20,7 @@ setup(
     url = "https://github.com/Smart-Ag/corncobs",
     py_modules=['corncobs'],
     install_requires=['pyserial', 'cobs'],
-    setup_requires=['pytest-runner'],
+    setup_requires=['pytest-runner', 'cobs', 'pyserial'],
     tests_require=['pytest'],
     packages=find_packages(exclude=['docs', 'tests']),
     long_description=read('README.md'),
