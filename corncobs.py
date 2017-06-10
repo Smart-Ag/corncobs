@@ -143,6 +143,7 @@ class StreamCOBS(object):
         self.stream = stream
         self.callbacks = []
         self.loop_running = False
+        self.stream.flush()
 
     def write(self, data):
         """
@@ -159,7 +160,9 @@ class StreamCOBS(object):
             Number of bytes written to stream
         """
         encoded_data =  b'\0' + cobs.encode(data) + b'\0'
-        return self.stream.write(encoded_data)
+        ret = self.stream.write(encoded_data)
+        self.stream.flush()
+        return ret
 
     def write_packet(self, packet):
         """Writes a DataPacket encoded using COBS.
