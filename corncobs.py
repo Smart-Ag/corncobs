@@ -64,6 +64,10 @@ class DataPacket(object):
         """Check equality of datapackets."""
         return self.values == other.values
 
+    def __repr__(self):
+        """Useful for printing the data packet."""
+        return str(self.values)
+
     def copy(self):
         """Returns a copy."""
         return DataPacket(self.definition, self.values)
@@ -143,7 +147,18 @@ class StreamCOBS(object):
         self.stream = stream
         self.callbacks = []
         self.loop_running = False
-        self.stream.flush()
+
+    def _read_stream(self, nbytes):
+        """
+        Override this to accomodate different types of stream objects (e.g. sockets)
+        """
+        return self.stream.read(nbytes)
+
+    def _write_stream(self, data):
+        """
+        Override this to accomodate different types of stream objects (e.g. sockets)
+        """
+        return self.stream.write(data)
 
     def write(self, data):
         """
@@ -160,7 +175,7 @@ class StreamCOBS(object):
             Number of bytes written to stream
         """
         encoded_data =  b'\0' + cobs.encode(data) + b'\0'
-        ret = self.stream.write(encoded_data)
+        ret = self._write_stream(encoded_data)
         self.stream.flush()
         return ret
 
@@ -189,7 +204,7 @@ class StreamCOBS(object):
         start_byte = -1
         for i in range(max_bytes-5):
             try:
-                start_byte = self.stream.read(1)
+                start_byte = self._read_stream(1)
             except:
                 continue
             if start_byte == b'\0':
@@ -199,7 +214,7 @@ class StreamCOBS(object):
 
         while True:
             try:
-                inbyte = self.stream.read(1)
+                inbyte = self._read_stream(1)
             except:
                 continue
             if inbyte != b'\x00':  # Read till next null byte
@@ -264,3 +279,11 @@ class SerialCOBS(StreamCOBS):
     def __init__(self, serial_port, *args, **kwargs):
         self.ser = serial.serial_for_url(serial_port, *args, **kwargs)
         super().__init__(self.ser)
+
+class TCPSocketCOBS(StreamCOBS):
+    """A TCP socket implementation of StreamCOBS."""
+    def _read_stream(self, nbytes):
+        return self.stream.recv(nbytes)
+
+    def _write_stream(self, data):
+        return self.stream.sendall(data)
