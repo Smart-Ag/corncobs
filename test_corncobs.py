@@ -18,7 +18,7 @@ def test_datapacket():
 
     pck = DataPacket(packet_def, data)
 
-    assert pck.fmt == 'fB'
+    assert pck.fmt == '<fB'
     assert pck.calcsize() == 5
     assert pck.values == data
 

@@ -1,4 +1,4 @@
-__version__ = '0.4.1'
+__version__ = '0.5'
 
 import io
 import struct
@@ -35,7 +35,7 @@ class DataPacket(object):
             self.fields.append(f_name)
 
         self.definition = definition
-        self.fmt = ''.join(data_format)
+        self.fmt = '<'+''.join(data_format)
 
         if values is not None:
             self.init(values)
@@ -112,7 +112,8 @@ class DataPacket(object):
             raise ValueError('Data packet not initialized!')
 
         values = (self.values[f_name] for f_name in self.fields)
-        return struct.pack(self.fmt, *values)
+        data = struct.pack(self.fmt, *values)
+        return data + crc16(data)
 
     def unpack(self, buffer):
         """
@@ -123,14 +124,21 @@ class DataPacket(object):
         buffer - bytearray
             Buffer to be unpacked into pre-defined data structure
         """
-        data = struct.unpack(self.fmt, buffer)
-        if self.values is None:
-            self.values = {}
+        # Extract CRC and check integrity
+        crc = buffer[-2:]
+        data = buffer[:-2]
+        
+        if crc16(data) != crc:
+            raise ValueError('CRC checksum failed!')
+        else:
+            values = struct.unpack(self.fmt, data)
+            if self.values is None:
+                self.values = {}
 
-        for f_name, value in zip(self.fields, data):
-            self.values[f_name] = value
+            for f_name, value in zip(self.fields, values):
+                self.values[f_name] = value
 
-        return dict(self.values)
+            return dict(self.values)
 
     def unpack_from(self, stream):
         """Read and unpack data from a buffered stream.
@@ -145,6 +153,26 @@ class DataPacket(object):
         data = stream.read()
         return self.unpack(data)
 
+# Ref: https://gist.github.com/oysstu/68072c44c02879a2abf94ef350d1c7c6
+# Ref: http://www8.cs.umu.se/~isak/snippets/crc-16.c
+def crc16(data: bytes) -> bytes:
+    """
+    CRC-16-CCITT Algorithm
+    """
+    data = bytearray(data)
+    poly = 0x8408
+    crc = 0xFFFF
+    for b in data:
+        cur_byte = 0xFF & b
+        for _ in range(0, 8):
+            if (crc & 0x0001) ^ (cur_byte & 0x0001):
+                crc = (crc >> 1) ^ poly
+            else:
+                crc >>= 1
+            cur_byte >>= 1
+    crc = (~crc & 0xFFFF)
+    crc = (crc << 8) | ((crc >> 8) & 0xFF)
+    return struct.pack('<H', crc & 0xFFFF)
 
 class StreamCOBS(object):
     """Class that sends and receives data in COBS format from a stream"""
