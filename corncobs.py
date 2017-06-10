@@ -1,4 +1,4 @@
-__version__ = '0.4'
+__version__ = '0.4.1'
 
 import io
 import struct
@@ -8,16 +8,17 @@ import collections.abc as cabc
 import serial
 from cobs import cobs
 
+
 class DataPacket(object):
-    datatypes = {'float32' : 'f',
-                 'float'   : 'f',
-                 'uint8'   : 'B',
-                 'uint16'  : 'H',
-                 'uint32'  : 'I',
-                 'int8'    : 'b',
-                 'int16'   : 'h',
-                 'int32'   : 'i',
-                 'string'  : 's'}
+    datatypes = {'float32': 'f',
+                 'float': 'f',
+                 'uint8': 'B',
+                 'uint16': 'H',
+                 'uint32': 'I',
+                 'int8': 'b',
+                 'int16': 'h',
+                 'int32': 'i',
+                 'string': 's'}
 
     def __init__(self, definition, values=None):
         """
@@ -28,7 +29,8 @@ class DataPacket(object):
         self.fields = []
         for f_name, f_type in definition:
             if f_type not in DataPacket.datatypes:
-                raise ValueError('Invalid datatype',f_type,' for field',f_name)
+                raise ValueError('Invalid datatype', f_type,
+                                 ' for field', f_name)
             data_format.append(DataPacket.datatypes[f_type])
             self.fields.append(f_name)
 
@@ -54,11 +56,14 @@ class DataPacket(object):
                 raise ValueError('Key name mismatch')
         elif isinstance(values, cabc.Sequence):
             if len(values) == len(self.fields):
-                self.values = {f_name: val for f_name,val in zip(self.fields, values)}
+                self.values = {f_name: val for f_name,
+                               val in zip(self.fields, values)}
             else:
-                raise ValueError('Number of values {} does not must match number of fields, {}'.format(len(values), len(self.fields)))
+                raise ValueError('Number of values {} does not must match number of fields, {}'.format(
+                    len(values), len(self.fields)))
         else:
-            raise ValueError('Input to init() should be either a sequence or a mapping')
+            raise ValueError(
+                'Input to init() should be either a sequence or a mapping')
 
     def __eq__(self, other):
         """Check equality of datapackets."""
@@ -143,6 +148,7 @@ class DataPacket(object):
 
 class StreamCOBS(object):
     """Class that sends and receives data in COBS format from a stream"""
+
     def __init__(self, stream):
         self.stream = stream
         self.callbacks = []
@@ -174,20 +180,10 @@ class StreamCOBS(object):
         int
             Number of bytes written to stream
         """
-        encoded_data =  b'\0' + cobs.encode(data) + b'\0'
+        encoded_data = b'\0' + cobs.encode(data) + b'\0'
         ret = self._write_stream(encoded_data)
         self.stream.flush()
         return ret
-
-    def write_packet(self, packet):
-        """Writes a DataPacket encoded using COBS.
-
-        Parameters
-        ----------
-        packet : DataPacket
-            Data packet to be written to stream
-        """
-        self.write(packet.pack())
 
     def read(self, max_bytes=255):
         """
@@ -202,7 +198,7 @@ class StreamCOBS(object):
         count = 0
 
         start_byte = -1
-        for i in range(max_bytes-5):
+        for i in range(max_bytes - 5):
             try:
                 start_byte = self._read_stream(1)
             except:
@@ -218,10 +214,11 @@ class StreamCOBS(object):
             except:
                 continue
             if inbyte != b'\x00':  # Read till next null byte
-                if count==max_bytes or len(inbyte) == 0:  # Stop if data stream too long
+                # Stop if data stream too long
+                if count == max_bytes or len(inbyte) == 0:
                     return None
                 raw_data.append(inbyte[0])
-                count+=1
+                count += 1
                 continue
             break  # Stop on null byte
         if len(raw_data) < 2:
@@ -252,7 +249,7 @@ class StreamCOBS(object):
             try:
                 self.update()
             except Exception as e:
-                print('COB Loop Error:',e)
+                print('COB Loop Error:', e)
 
     def loop_stop(self):
         """Stop update loop."""
@@ -267,7 +264,7 @@ class StreamCOBS(object):
 
 class SerialCOBS(StreamCOBS):
     """
-    A serial implementation of StreamCOBS using pySerial.
+    A serial wrapper for StreamCOBS using pyserial.
 
     Parameters
     ----------
@@ -276,14 +273,46 @@ class SerialCOBS(StreamCOBS):
 
     All other position and keyword arguments are passed directly to pyserial
     """
+
     def __init__(self, serial_port, *args, **kwargs):
         self.ser = serial.serial_for_url(serial_port, *args, **kwargs)
         super().__init__(self.ser)
 
+
 class TCPSocketCOBS(StreamCOBS):
-    """A TCP socket implementation of StreamCOBS."""
+    """A TCP socket wrapper for StreamCOBS."""
+
     def _read_stream(self, nbytes):
         return self.stream.recv(nbytes)
 
     def _write_stream(self, data):
         return self.stream.sendall(data)
+
+
+class PacketCOBS(object):
+    """Class for reading/writing data packets to a variety of streams."""
+    driver_list = {'stream': StreamCOBS,
+                   'serial': SerialCOBS,
+                   'socket': TCPSocketCOBS}
+
+    def __init__(self, source, packet_def, *args, driver='stream', **kwargs):
+        self.driver = self.driver_list[driver](source, *args, **kwargs)
+        self.source = source
+        # self.packet_def = packet_def
+        self._packet = DataPacket(packet_def)
+
+    def read(self):
+        """Reads and decodes a data packet from stream."""
+        self._packet.unpack_from(self.driver)
+        return self._packet.copy()
+
+    def write(self, packet):
+        """
+        Writes a data packet to the connected stream
+
+        Parameters
+        ----------
+        packet : DataPacket
+            Data packet to be written to stream
+        """
+        self.driver.write(packet.pack())

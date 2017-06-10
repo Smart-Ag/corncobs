@@ -3,15 +3,16 @@ import struct
 import time
 
 import pytest
-from corncobs import DataPacket, StreamCOBS, SerialCOBS
+from corncobs import *
+
 
 def test_datapacket():
     """Unit test for datapacket class."""
 
     with pytest.raises(ValueError):
-        DataPacket([('foobar','blahtype')])
+        DataPacket([('foobar', 'blahtype')])
 
-    packet_def = [('cxthrottle','float32'), ('cxreqgear','uint8')]
+    packet_def = [('cxthrottle', 'float32'), ('cxreqgear', 'uint8')]
     data = {'cxthrottle': 1.0, 'cxreqgear': 4}
     data_list = [1.0, 4]
 
@@ -27,7 +28,7 @@ def test_datapacket():
 
     # Test that init() fails with wrong field names
     with pytest.raises(ValueError):
-        pck.init({'badfield':1.0, 'foo':20})
+        pck.init({'badfield': 1.0, 'foo': 20})
 
     with pytest.raises(ValueError):
         pck.init([1.0, 2, 3])
@@ -98,27 +99,29 @@ def test_datapacket():
 def test_streamcobs():
     """Unit test for StreamCOBS"""
 
-    def do_test(cobs_io, test_array, test_packet):
+    def do_test(cobs_io, test_array, test_pkt):
         # Test cobs with bytes
-        if cobs_io.stream.seekable(): cobs_io.stream.seek(0)
+        if cobs_io.stream.seekable():
+            cobs_io.stream.seek(0)
         cobs_io.write(test_array)
 
-        if cobs_io.stream.seekable(): cobs_io.stream.seek(0)
+        if cobs_io.stream.seekable():
+            cobs_io.stream.seek(0)
         assert cobs_io.read() == test_array
 
         # Test writing packets
         if cobs_io.stream.seekable(): cobs_io.stream.seek(0)
-        cobs_io.write_packet(test_packet)
-        if cobs_io.stream.seekable(): cobs_io.stream.seek(0)
-
-        out_packet = test_packet.copy()
-        out_packet.values = None
-        out_packet.unpack_from(cobs_io)
-        assert out_packet == test_packet
+        pks = PacketCOBS(cobs_io.stream, test_pkt.definition, driver='stream')
+        pks.write(test_pkt)
+        if cobs_io.stream.seekable():
+            cobs_io.stream.seek(0)
+        out_packet = pks.read()
+        assert out_packet == test_pkt
 
         # Test callback system
         cb_called = False
         out_cb = None
+
         def cb(packet):
             nonlocal cb_called, out_cb
             cb_called = True
@@ -128,11 +131,11 @@ def test_streamcobs():
 
         # Wait for callback to trigger
         t0 = time.time()
-        timeout = 2.0 # seconds
+        timeout = 2.0  # seconds
 
         cobs_io.write(test_array)
         if cobs_io.stream.seekable():
-            cobs_io.stream.seek(0) # Required for byteio stream
+            cobs_io.stream.seek(0)  # Required for byteio stream
 
         while not cb_called and time.time() - t0 < timeout:
             time.sleep(0.1)
@@ -140,12 +143,13 @@ def test_streamcobs():
         assert out_cb == test_array
 
         # Test with zeros
-        if cobs_io.stream.seekable(): cobs_io.stream.seek(0)
+        if cobs_io.stream.seekable():
+            cobs_io.stream.seek(0)
         cobs_io.write(b'\0')
-        if cobs_io.stream.seekable(): cobs_io.stream.seek(0)
+        if cobs_io.stream.seekable():
+            cobs_io.stream.seek(0)
         assert cobs_io.read(max_bytes=5) == None
         assert cobs_io.read(max_bytes=5) == None
-
 
         # Stop the loop
         cobs_io.loop_stop()
@@ -153,13 +157,13 @@ def test_streamcobs():
 
     test_array = bytearray(range(4))
     test_stream = io.BytesIO(bytearray(20))
-    packet_def = [('cxthrottle','float32'), ('cxreqgear','uint8')]
-    test_packet = DataPacket(packet_def, [0.5, 2])
+    packet_def = [('cxthrottle', 'float32'), ('cxreqgear', 'uint8')]
+    test_pkt = DataPacket(packet_def, [0.5, 2])
 
     stream_cobs = StreamCOBS(test_stream)
-    do_test(stream_cobs, test_array, test_packet)
+    do_test(stream_cobs, test_array, test_pkt)
 
     loop_cobs = SerialCOBS('loop://')
-    do_test(loop_cobs, test_array, test_packet)
+    do_test(loop_cobs, test_array, test_pkt)
 
     print('All tests passed!')
