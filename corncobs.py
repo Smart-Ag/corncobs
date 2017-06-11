@@ -73,6 +73,9 @@ class DataPacket(object):
         """Useful for printing the data packet."""
         return str(self.values)
 
+    def __getitem__(self, key):
+        return self.values[key]
+
     def copy(self):
         """Returns a copy."""
         return DataPacket(self.definition, self.values)
@@ -151,7 +154,10 @@ class DataPacket(object):
             Stream to read the bytes from
         """
         data = stream.read()
-        return self.unpack(data)
+        if data is not None:
+            return self.unpack(data)
+        else:
+            return None
 
 # Ref: https://gist.github.com/oysstu/68072c44c02879a2abf94ef350d1c7c6
 # Ref: http://www8.cs.umu.se/~isak/snippets/crc-16.c
@@ -210,7 +216,6 @@ class StreamCOBS(object):
         """
         encoded_data = b'\0' + cobs.encode(data) + b'\0'
         ret = self._write_stream(encoded_data)
-        self.stream.flush()
         return ret
 
     def read(self, max_bytes=255):
@@ -311,7 +316,11 @@ class TCPSocketCOBS(StreamCOBS):
     """A TCP socket wrapper for StreamCOBS."""
 
     def _read_stream(self, nbytes):
-        return self.stream.recv(nbytes)
+        data = self.stream.recv(nbytes)
+        if data is not None:
+            return data
+        else:
+            return bytearray()
 
     def _write_stream(self, data):
         return self.stream.sendall(data)
