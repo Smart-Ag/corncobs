@@ -4,8 +4,7 @@ import time
 
 import pytest
 from corncobs import *
-
-
+    
 def test_datapacket():
     """Unit test for datapacket class."""
 
