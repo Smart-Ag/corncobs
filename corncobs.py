@@ -82,7 +82,7 @@ class DataPacket(object):
 
     def calcsize(self):
         """Returns the size of the data packet."""
-        return struct.calcsize(self.fmt)
+        return struct.calcsize(self.fmt)+2
 
     def set_field(self, field_name, value):
         """Sets value of a specific field in the data packet.
