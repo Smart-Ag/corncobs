@@ -1,4 +1,4 @@
-__version__ = '0.5'
+__version__ = '0.6'
 
 import io
 import struct
@@ -270,13 +270,13 @@ class StreamCOBS(object):
         """Adds a callback."""
         self.callbacks.append(cb)
 
-    def loop_thread(self):
+    def loop_start(self):
         """Start update loop in a background thread."""
         self.loop_running = True
-        t = threading.Thread(target=self.loop_start, daemon=True)
+        t = threading.Thread(target=self.loop_thread, daemon=True)
         t.start()
 
-    def loop_start(self):
+    def loop_thread(self):
         """Start update loop."""
         while self.loop_running:
             try:
@@ -287,10 +287,11 @@ class StreamCOBS(object):
     def loop_stop(self):
         """Stop update loop."""
         self.loop_running = False
-        self.close()
+
 
     def close(self):
-        """Optional close functionality."""
+        """Close functionality."""
+        self.loop_stop()
         if hasattr(self.stream, 'close'):
             self.stream.close()
 

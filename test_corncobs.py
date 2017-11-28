@@ -4,7 +4,7 @@ import time
 
 import pytest
 from corncobs import *
-    
+
 def test_datapacket():
     """Unit test for datapacket class."""
 
@@ -135,7 +135,7 @@ def test_streamcobs():
             cb_called = True
             out_cb = packet
         cobs_io.add_listener(cb)
-        cobs_io.loop_thread()
+        cobs_io.loop_start()
 
         # Wait for callback to trigger
         t0 = time.time()
@@ -160,7 +160,7 @@ def test_streamcobs():
         assert cobs_io.read(max_bytes=5) == None
 
         # Stop the loop
-        cobs_io.loop_stop()
+        cobs_io.close()
         assert cobs_io.stream.closed
 
     test_array = bytearray(range(4))
