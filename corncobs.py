@@ -312,6 +312,14 @@ class SerialCOBS(StreamCOBS):
         self.ser = serial.serial_for_url(serial_port, *args, **kwargs)
         super().__init__(self.ser)
 
+    def flush(self):
+        try:
+            self.ser.flush()
+            self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+        except Exception as e:
+            pass
+
 
 class TCPSocketCOBS(StreamCOBS):
     """A TCP socket wrapper for StreamCOBS."""
